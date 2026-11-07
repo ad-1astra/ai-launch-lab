@@ -1,0 +1,3 @@
+node_modules/
+*.parquet
+artifact-index.html

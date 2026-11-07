@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2307111f%22/%3E%3Crect x=%2214%22 y=%2220%22 width=%2213%22 height=%2218%22 rx=%226%22 fill=%22%232fe0cf%22/%3E%3Crect x=%2237%22 y=%2220%22 width=%2213%22 height=%2218%22 rx=%226%22 fill=%22%232fe0cf%22/%3E%3Cpath d=%22M24 46q8 6 16 0%22 stroke=%22%23ff8a3d%22 stroke-width=%224%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Test Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono&family=Chakra+Petch:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/academy.css">
+<style>
+  .game.arena { background: radial-gradient(ellipse at 50% 30%, #17304f, var(--bg) 70%); overflow-y: auto; }
+  .board { position: relative; z-index: 5; max-width: 900px; margin: 0 auto; padding: 96px 16px 32px; display: grid; gap: 14px; }
+  .status { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-family: var(--f-hud); font-size: 0.85rem; }
+  .status .grow { flex: 1; }
+  .status b { color: var(--cyan); font-size: 1.1rem; }
+  .timer { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+  .timer i { display: block; height: 100%; width: 100%; background: var(--cyan); }
+  .qtext { font-size: clamp(1.15rem, 3.2vw, 1.6rem); font-weight: 700; min-height: 3em; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .opts button { display: flex; gap: 10px; align-items: center; text-align: left; min-height: 64px; padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; cursor: pointer; }
+  .opts button:hover { border-color: var(--cyan); }
+  .opts button .L { font-family: var(--f-hud); color: var(--cyan); flex: none; }
+  .opts button.right { border-color: var(--green); background: rgba(75, 227, 138, 0.16); }
+  .opts button.wrong { border-color: var(--red); background: rgba(255, 90, 79, 0.16); }
+  .why { color: var(--dim); min-height: 1.5em; }
+  .pads { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pad { border: 1px solid var(--line); border-radius: var(--r); padding: 10px; background: var(--panel); }
+  .pad h3 { font-size: 0.95rem; display: flex; justify-content: space-between; }
+  .pad .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+  .pad .keys button { min-height: 52px; border-radius: 8px; border: 1px solid var(--line); background: var(--raised); color: var(--fg); font: 700 1rem var(--f-hud); cursor: pointer; }
+  .pad.locked { opacity: 0.4; }
+  .pad.scored { border-color: var(--green); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+  .chips button { border: 1px solid var(--line); background: var(--raised); color: var(--dim); border-radius: 999px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  .chips button.on { border-color: var(--cyan); color: var(--cyan); }
+  .modes { display: grid; gap: 10px; }
+  .modes button { text-align: left; padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; cursor: pointer; display: grid; gap: 2px; }
+  .modes button:hover { border-color: var(--cyan); }
+  .modes button span { color: var(--dim); font-size: 0.9rem; }
+  .missed { display: grid; gap: 8px; max-height: 40vh; overflow-y: auto; }
+  .missed div { border-left: 3px solid var(--amber); padding-left: 10px; }
+  .missed p { color: var(--dim); font-size: 0.9rem; }
+  @media (max-width: 640px) { .opts { grid-template-columns: 1fr; } .board { padding-top: 84px; } }
+</style>
+</head>
+<body>
+<main class="game arena"><div class="board" id="board"></div></main>
+<script>window.AC_UNIT = 'Module'</script>
+<script src="js/core.js"></script>
+<script src="js/questions.js"></script>
+<script src="js/arena.js"></script>
+</body>
+</html>
