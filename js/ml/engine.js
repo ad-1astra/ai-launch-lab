@@ -95,7 +95,7 @@
         if (bad) {
           // Deliberately wrong template, used to demonstrate the silent failure the guide warns about.
           if (m.role === 'user') push(this.encode('### Instruction:\n' + m.content + '\n### Response:\n'), 0);
-          else if (m.role === 'assistant') push([...this.eventIds(m.events), ...this.encode(m.content), this.END], 1);
+          else if (m.role === 'assistant') push([...this.encode(m.content), this.END], 1);
           continue;
         }
         if (m.role === 'system') { push([this.SYSTEM, ...this.encode(m.content), this.END], 0); }
@@ -103,7 +103,6 @@
         else if (m.role === 'tool') { push([this.TOOL, ...this.encode(m.content), this.END], 0); }
         else if (m.role === 'assistant') {
           push([this.ASSISTANT], 0);
-          push(this.eventIds(m.events), 1);
           if (m.tool_call) { push([this.CALL, ...this.encode(JSON.stringify(m.tool_call)), this.ENDCALL], 1); }
           push(this.encode(m.content || ''), 1);
           push([this.END], 1);
@@ -421,26 +420,23 @@
     let L = null;
     for (let i = start; i < ids.length; i++) L = sess.step(ids[i]);
     const out = [];
-    let logp = 0, firstAt = 0;
-    const eventIdsSet = tok.eventSet;
-    const banEvents = new Set(eventIdsSet);
+    let logp = 0, firstAt = 0, nText = 0;
     const seen = new Map();
     let inCall = false;
     for (let k = 0; k < o.maxNew; k++) {
-      const so = { temperature: o.temperature, topK: o.topK };
-      if (o.grammar && k < FIELD_ORDER.length) so.allow = new Set(tok.fieldIds[FIELD_ORDER[k]]);
-      else if (o.grammar) so.banned = banEvents;
+      const so = { temperature: o.temperature, topK: o.topK, banned: tok.eventSet };
       if (o.rep > 1 && !inCall) {
         for (const [id, cnt] of seen) { if (id >= ML.N_SPECIAL + 100 && cnt > 0 && L[id] > 0) L[id] /= Math.pow(o.rep, cnt); else if (id >= ML.N_SPECIAL + 100 && cnt > 0) L[id] *= Math.pow(o.rep, cnt); }
       }
       const id = sample(L, so, rng);
       if (id < 0) break;
-      // running log-probability, used for confidence checks
+      if (!firstAt) firstAt = now();
+      // running log-probability of the words, used for confidence checks
       let mx = -Infinity, sum = 0;
       for (let v = 1; v < L.length; v++) if (L[v] > mx) mx = L[v];
       for (let v = 1; v < L.length; v++) sum += Math.exp(L[v] - mx);
       logp += L[id] - mx - Math.log(sum);
-      if (!firstAt) firstAt = now();
+      nText++;
       if (id === tok.END) break;
       out.push(id);
       seen.set(id, (seen.get(id) || 0) + 1);
@@ -450,6 +446,10 @@
       if (sess.t >= c.ctx) break;
       L = sess.step(id);
     }
+    // The five event fields come from closed-choice heads on the model's final state, so the JSON is always valid.
+    let events = null;
+    const heads = o.heads || (o.adapter && o.adapter.heads);
+    if (heads) events = ML.applyEventHeads(heads, ML.eventFeature(net, null, ids.concat(out)));
     const done = now();
     const callStart = out.indexOf(tok.CALL), callEnd = out.indexOf(tok.ENDCALL);
     let toolCall = null;
@@ -458,30 +458,140 @@
     }
     const textIds = callStart >= 0 ? out.filter((_, i) => i < callStart || i > callEnd) : out;
     return {
-      ids: out, text: tok.decode(textIds).trim(), events: tok.parseEvents(out), toolCall,
-      logp, meanLogp: out.length ? logp / out.length : 0, tokens: out.length, promptTokens: ids.length,
+      ids: out, text: tok.decode(textIds).trim(), events, toolCall,
+      logp, meanLogp: nText ? logp / nText : 0, tokens: out.length, promptTokens: ids.length,
       ttftMs: firstAt - t0, ms: done - t0, session: sess,
     };
   };
   function now() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
   ML.now = now;
 
+  // ------------------------------------------------------------ question matcher
+  /* TF-IDF cosine over words and stems: finds the closest question the model trained on.
+     A tiny model memorises rather than generalises, so this step is what lets it handle rephrasing.
+     Queries with digits are left alone, because their numbers matter. */
+  const NO_STEM = new Set(['evening', 'morning', 'string', 'thing', 'nothing', 'something', 'bring', 'during', 'king']);
+  const mStem = (w) => (NO_STEM.has(w) ? w : w.length > 4 && w.endsWith('ing') ? w.slice(0, -3) : w.length > 4 && w.endsWith('ed') ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+  const mWords = (s) => String(s).toLowerCase().replace(/[^a-z0-9\s/]/g, ' ').split(/\s+/).filter(Boolean).map(mStem);
+  class Matcher {
+    constructor(questions) {
+      this.items = [];
+      this.df = new Map();
+      this.add(questions || []);
+    }
+    add(questions, tag = 'base') {
+      for (const q of questions) {
+        const toks = mWords(q);
+        if (!toks.length) continue;
+        const tf = new Map();
+        for (const t of toks) tf.set(t, (tf.get(t) || 0) + 1);
+        for (const t of tf.keys()) this.df.set(t, (this.df.get(t) || 0) + 1);
+        this.items.push({ q, tf, norm: 0, tag });
+      }
+      this.N = this.items.length || 1;
+      for (const it of this.items) { let n = 0; for (const [t, f] of it.tf) { const w = f * this.idf(t); n += w * w; } it.norm = Math.sqrt(n) || 1; }
+    }
+    idf(t) { return Math.log(1 + this.N / (1 + (this.df.get(t) || 0))); }
+    best(text) {
+      const toks = mWords(text);
+      const tf = new Map();
+      for (const t of toks) tf.set(t, (tf.get(t) || 0) + 1);
+      let qn = 0;
+      for (const [t, f] of tf) { const w = f * this.idf(t); qn += w * w; }
+      qn = Math.sqrt(qn) || 1;
+      let best = null, bs = 0;
+      for (const it of this.items) {
+        let dot = 0;
+        for (const [t, f] of tf) { const g = it.tf.get(t); if (g) { const i = this.idf(t); dot += f * i * g * i; } }
+        // a question the adapter studied wins a tie: that is where the newest, most specific answer lives
+        const s = (dot / (qn * it.norm)) * (it.tag === 'adapter' ? 1.0001 : 1); // on a tie, the question the adapter studied wins
+        if (s > bs) { bs = s; best = it; }
+      }
+      return { q: best ? best.q : null, score: bs, tag: best ? best.tag : null };
+    }
+    // Returns the prompt to send to the model.
+    rewrite(text, threshold = 0.42) {
+      if (/\d/.test(text)) return { text, score: 0, matched: false, tag: 'base' };
+      const b = this.best(text);
+      if (b.q && b.score >= threshold) return { text: b.q, score: b.score, matched: true, tag: b.tag };
+      return { text, score: b.score, matched: false, tag: 'base' };
+    }
+  }
+  ML.Matcher = Matcher;
+
+  // ------------------------------------------------------------ event heads
+  // A small softmax trained on fixed features with Adam.
+  ML.trainSoftmax = function (feats, labels, classes, { steps = 260, lr = 0.02, seed = 1, batch = 64 } = {}) {
+    const d = feats[0].length, W = new Float32Array(classes * (d + 1));
+    const adam = new ML.Adam([W], { clip: 0 });
+    const rng = ML.rng(seed);
+    const g = new Float32Array(W.length), p = new Float32Array(classes);
+    for (let t = 0; t < steps; t++) {
+      g.fill(0);
+      const bs = Math.min(batch, feats.length);
+      for (let b = 0; b < bs; b++) {
+        const i = Math.floor(rng() * feats.length), f = feats[i], y = labels[i];
+        let mx = -Infinity;
+        for (let c = 0; c < classes; c++) { const o = c * (d + 1); let s = W[o + d]; for (let k = 0; k < d; k++) s += W[o + k] * f[k]; p[c] = s; if (s > mx) mx = s; }
+        let sum = 0;
+        for (let c = 0; c < classes; c++) { p[c] = Math.exp(p[c] - mx); sum += p[c]; }
+        for (let c = 0; c < classes; c++) { const e = p[c] / sum - (c === y ? 1 : 0), o = c * (d + 1); for (let k = 0; k < d; k++) g[o + k] += e * f[k]; g[o + d] += e; }
+      }
+      for (let i = 0; i < g.length; i++) g[i] /= bs;
+      adam.step([g], lr);
+    }
+    return W;
+  };
+  ML.applySoftmax = function (W, f, classes) {
+    const d = f.length;
+    let best = 0, bv = -Infinity;
+    for (let c = 0; c < classes; c++) { const o = c * (d + 1); let s = W[o + d]; for (let k = 0; k < d; k++) s += W[o + k] * f[k]; if (s > bv) { bv = s; best = c; } }
+    return best;
+  };
+  ML.applyEventHeads = function (heads, f) {
+    const e = {};
+    for (const field of FIELD_ORDER) {
+      const vals = ML.SCHEMA[field], W = heads[field];
+      if (!W) return null;
+      const v = vals[ML.applySoftmax(W, f, vals.length)];
+      e[field] = field === 'intensity' ? parseFloat(v) : v;
+    }
+    return e;
+  };
+  // features: [Float32Array], events: [{emotion,...}] per row
+  ML.trainEventHeads = function (feats, events) {
+    const heads = {};
+    for (const field of FIELD_ORDER) {
+      const vals = ML.SCHEMA[field].map(String);
+      const labels = events.map((e) => Math.max(0, vals.indexOf(String(e[field]))));
+      heads[field] = ML.trainSoftmax(feats, labels, vals.length, { seed: 3 + field.length });
+    }
+    return heads;
+  };
+  // The final state the heads read: the state after the last word, on prompt + reply.
+  ML.eventFeature = function (net, adapter, ids) {
+    const s = new Session(net, adapter);
+    for (const i of ids.slice(0, net.cfg.ctx)) s.step(i);
+    return s.n.slice(0);
+  };
+
   // ------------------------------------------------------------ LoRA adapters
-  ML.newAdapter = function (net, { rank = 16, alpha = 16, seed = 1, targets = null, addedTokens = true } = {}) {
+  ML.newAdapter = function (net, { rank = 16, alpha = 16, seed = 1, targets = null, addedTokens = false, fromLayer = 0 } = {}) {
     const rng = ML.rng(seed);
     const A = {}, B = {};
     for (const li of net.linears) {
       if (targets && !targets.includes(li.n)) continue;
+      if (li.l < fromLayer) continue;
       const a = new Float32Array(li.din * rank);
       const span = 1 / Math.sqrt(li.din);
       for (let i = 0; i < a.length; i++) a[i] = (rng() * 2 - 1) * span; // Kaiming-uniform style, as in PEFT
       A[li.name] = a;
       B[li.name] = new Float32Array(rank * li.dout); // starts at zero: the adapter begins as a no-op
     }
-    const ad = { rank, alpha, A, B };
+    const ad = { rank, alpha, A, B, fromLayer };
     if (addedTokens) {
       // Reserved tokens (event and tool tokens) never appeared in base pretraining, so the adapter owns their embeddings.
-      const from = 7, to = ML.N_SPECIAL, d = net.cfg.d;
+      const from = 7, to = 9, d = net.cfg.d; // <tool_call> and </tool_call>
       ad.addedFrom = from; ad.addedTo = to;
       ad.added = new Float32Array((to - from) * d);
       ad.added.set(net.w.tok.subarray(from * d, to * d));
@@ -504,14 +614,16 @@
     const t = {};
     for (const k in ad.A) { t['A.' + k] = ad.A[k]; t['B.' + k] = ad.B[k]; }
     if (ad.added) t.added = ad.added;
-    return ML.writeSafetensors(t, { rank: ad.rank, alpha: ad.alpha, addedFrom: ad.addedFrom, addedTo: ad.addedTo });
+    if (ad.heads) for (const f in ad.heads) t['head.' + f] = ad.heads[f];
+    return ML.writeSafetensors(t, { rank: ad.rank, alpha: ad.alpha, addedFrom: ad.addedFrom, addedTo: ad.addedTo, fromLayer: ad.fromLayer || 0 });
   };
   ML.parseAdapter = function (buf) {
     const { tensors, meta } = ML.parseSafetensors(buf);
-    const ad = { rank: +meta.rank, alpha: +meta.alpha, A: {}, B: {} };
+    const ad = { rank: +meta.rank, alpha: +meta.alpha, A: {}, B: {}, fromLayer: +(meta.fromLayer || 0) };
     if (meta.addedFrom !== 'undefined') { ad.addedFrom = +meta.addedFrom; ad.addedTo = +meta.addedTo; }
     for (const k in tensors) {
       if (k === 'added') ad.added = tensors[k];
+      else if (k.startsWith('head.')) { ad.heads = ad.heads || {}; ad.heads[k.slice(5)] = tensors[k]; }
       else if (k[0] === 'A') ad.A[k.slice(2)] = tensors[k];
       else ad.B[k.slice(2)] = tensors[k];
     }
@@ -534,7 +646,9 @@
       }
     }
     if (ad.added) w.tok.set(ad.added, ad.addedFrom * net.cfg.d);
-    return new GPT(net.cfg, w);
+    const merged = new GPT(net.cfg, w);
+    merged.heads = ad.heads || null;
+    return merged;
   };
 
   // Real linear quantisation. Returns the stored integers and the weights the runtime will actually use.
@@ -770,7 +884,8 @@
       this.lnBack(g, this.zf, this.sf, w['lnf.g'], d, T, OUT);
       let gx = new Float32Array(T * d);
       gx.set(OUT.subarray(0, T * d));
-      for (let l = c.L - 1; l >= 0; l--) {
+      const stopAt = ad.fromLayer || 0;
+      for (let l = c.L - 1; l >= stopAt; l--) {
         const Lb = this.layers[l], P = 'h' + l + '.';
         // x2 = x1 + M
         const gh = this.gh;
@@ -823,7 +938,7 @@
         this.lnBack(gn1, Lb.z1, Lb.s1, w[P + 'ln1.g'], d, T, gx0);
         gx = gx0;
       }
-      if (addA) {
+      if (addA && !stopAt) {
         const ga = this.gAdded;
         for (let t = 0; t < T; t++) {
           const tok = ids[t];

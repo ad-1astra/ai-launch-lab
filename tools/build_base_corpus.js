@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const ML = require('../js/ml/engine.js');
 const K = require('./knowledge.js');
+const AG = require('../js/lab/agent.js');
+const E = require('../js/lab/evalset.js');
 
 const [oasstPath, outDir] = process.argv.slice(2);
 const oasst = JSON.parse(fs.readFileSync(oasstPath, 'utf8'));
@@ -57,6 +59,30 @@ const ids = tok.encode(check);
 console.log('tokens', ids.length, '/', check.length, 'chars ->', ids.map((i) => JSON.stringify(tok.vocab[i])).join(' '));
 if (tok.decode(ids) !== check) throw new Error('round trip failed: ' + tok.decode(ids));
 
+// Native tool calling, as the guide asks of a base model: calculator and common agent commands.
+const toolRows = [];
+const OPS = [['+', 'plus'], ['-', 'minus'], ['*', 'times'], ['/', 'divided by']];
+const FORMS = [
+  (a, o, b) => `calculate ${a} ${o[0]} ${b}`, (a, o, b) => `Calculate ${a} ${o[0]} ${b}`, (a, o, b) => `compute ${a} ${o[0]} ${b}`, (a, o, b) => `Compute ${a} ${o[0]} ${b}`,
+  (a, o, b) => `What is ${a} ${o[0]} ${b} exactly?`, (a, o, b) => `use the calculator for ${a} ${o[0]} ${b}`, (a, o, b) => `what is ${a} ${o[1]} ${b}? use the calculator`,
+  (a, o, b) => `Please compute ${a} ${o[0]} ${b}`, (a, o, b) => `work out ${a} ${o[0]} ${b}`, (a, o, b) => `Work out ${a} ${o[0]} ${b}`, (a, o, b) => `what is ${a} ${o[0]} ${b} exactly? use the calculator`,
+];
+const sealedCalc = new Set(E.PROMPTS.concat(E.DEV).filter((p) => p.tool).map((p) => p.prompt));
+for (let n = 0; n < 1300; n++) {
+  const o = pick(OPS);
+  let a = Math.floor(rng() * 980) + 2, b = Math.floor(rng() * 90) + 2;
+  if (o[0] === '/') a = b * (Math.floor(rng() * 40) + 2);
+  const expr = a + ' ' + o[0] + ' ' + b;
+  const q = pick(FORMS)(a, o, b);
+  if (sealedCalc.has(q)) continue;
+  const v = o[0] === '+' ? a + b : o[0] === '-' ? a - b : o[0] === '*' ? a * b : a / b;
+  toolRows.push({ messages: [{ role: 'user', content: q }, { role: 'assistant', content: '', tool_call: { name: 'calculator', args: { expr } } }, { role: 'tool', content: String(v) }, { role: 'assistant', content: 'The answer is ' + v + '.' }] });
+}
+// Half of the agent trajectories go to the base, for native tool format. Fix flows stay out, for the coder adapter to learn.
+const traj = AG.trajectoryRows().filter((r) => !/fix|repair|make the tests pass|fails/.test(r.messages[0].content));
+traj.forEach((r, i) => { if (i % 2 === 0) toolRows.push({ messages: r.messages.map((m) => { const c = Object.assign({}, m); delete c.events; return c; }) }); });
+console.log('tool rows', toolRows.length);
+
 // encode with question augmentation
 const out = [];
 let totalTok = 0, tooLong = 0;
@@ -71,5 +97,16 @@ for (const r of rows) {
     srcCounts[r.src] = (srcCounts[r.src] || 0) + 1;
   }
 }
+for (const r of toolRows) {
+  const e = tok.encodeRow(r);
+  if (e.ids.length > 128) { tooLong++; continue; }
+  out.push({ i: e.ids, m: e.mask, s: 'tool' });
+  totalTok += e.ids.length;
+  srcCounts.tool = (srcCounts.tool || 0) + 1;
+}
+// question list for the matcher that sits in front of the model
+const known = [...new Set(rows.filter((r) => r.src !== 'maths').map((r) => r.q))];
+fs.writeFileSync(path.join(outDir, 'base_questions.json'), JSON.stringify(known));
+console.log('known questions', known.length);
 console.log('rows', out.length, 'tokens', totalTok, 'too long', tooLong, 'by source', srcCounts);
 fs.writeFileSync(path.join(outDir, 'base_ids.json'), JSON.stringify(out));

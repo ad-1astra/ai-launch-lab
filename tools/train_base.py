@@ -10,11 +10,12 @@ L = int(sys.argv[5]) if len(sys.argv) > 5 else 4
 H, CTX, V = 4, 128, 1400
 M = 2 * D
 BATCH, LR = 48, 2e-3
+DROP, SMOOTH = 0.08, 0.08
 torch.manual_seed(1); random.seed(1)
-torch.set_num_threads(10)
+torch.set_num_threads(11)
 
 rows = json.load(open(src))
-weights = {'stack': 3.0, 'general': 2.0, 'smalltalk': 3.0, 'code': 2.0, 'capitals': 1.0, 'maths': 0.25, 'oasst': 1.0}
+weights = {'stack': 3.0, 'general': 2.0, 'smalltalk': 3.0, 'code': 2.0, 'capitals': 1.0, 'maths': 0.25, 'oasst': 0.7, 'tool': 0.9}
 probs = [weights.get(r['s'], 1.0) for r in rows]
 print('rows', len(rows), flush=True)
 
@@ -35,8 +36,8 @@ class Block(nn.Module):
         a = a.masked_fill(mask[:, None, :, :] == 0, float('-inf'))
         a = a.softmax(-1)
         o = (a @ v).transpose(1, 2).reshape(B, T, D)
-        x = x + s.o(o)
-        x = x + s.m2(F.relu(s.m1(s.ln2(x))))
+        x = x + F.dropout(s.o(o), DROP, s.training)
+        x = x + F.dropout(s.m2(F.relu(s.m1(s.ln2(x)))), DROP, s.training)
         return x
 
 
@@ -111,7 +112,7 @@ for step in range(1, STEPS + 1):
     for g in opt.param_groups:
         g['lr'] = lr
     x, y = batch()
-    loss = F.cross_entropy(net(x).view(-1, V), y.view(-1), ignore_index=-100)
+    loss = F.cross_entropy(net(x).reshape(-1, V), y.reshape(-1), ignore_index=-100, label_smoothing=SMOOTH)
     opt.zero_grad(); loss.backward()
     nn.utils.clip_grad_norm_(net.parameters(), 1.0)
     opt.step()

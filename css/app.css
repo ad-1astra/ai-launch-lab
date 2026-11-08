@@ -1,0 +1,40 @@
+/* The finished AI's own page: face on one side, conversation on the other */
+.game.app #stage { right: 50%; }
+.app-side { position: absolute; top: 0; right: 0; bottom: 0; left: 50%; display: flex; flex-direction: column; background: var(--panel-solid); border-left: 1px solid var(--line); min-height: 0; }
+.app-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); min-height: 60px; }
+.app-head .grow { flex: 1; min-width: 0; }
+.app-head h1 { font-size: 1.2rem; color: var(--cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-head p { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-tabs { display: flex; gap: 2px; padding: 6px 10px 0; border-bottom: 1px solid var(--line); overflow-x: auto; flex: none; }
+.app-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; min-height: 40px; cursor: pointer; color: var(--dim); font-family: var(--f-display); font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
+.app-tabs button.on { color: var(--cyan); border-bottom-color: var(--cyan); }
+.app-pane { flex: 1; min-height: 0; position: relative; }
+.tab-pane { position: absolute; inset: 0; padding: 12px 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.tab-pane[hidden] { display: none; }
+.tab-pane h3 { font-size: 0.98rem; color: var(--cyan); }
+.chat-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+.msg { display: flex; flex-direction: column; gap: 3px; max-width: 92%; }
+.msg.me { align-self: flex-end; }
+.msg.ai { align-self: flex-start; }
+.bubble { padding: 8px 12px; border-radius: 12px; font-size: 0.96rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.me .bubble { background: #16405a; }
+.msg.ai .bubble { background: var(--raised); }
+.msg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--dim); }
+.msg-meta .mono { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.thumb { background: none; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; min-width: 34px; min-height: 30px; font-size: 0.82rem; }
+.thumb:hover, .thumb.on { border-color: var(--cyan); }
+.fix { display: flex; flex-direction: column; gap: 5px; margin-top: 3px; }
+.chat-form { display: flex; gap: 6px; flex: none; }
+.chat-form input { flex: 1; }
+.draw-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.draw { width: min(256px, 100%); aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--line); cursor: crosshair; touch-action: none; }
+.draw-tools { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+.draw-tools input[type="file"], .tab-pane input[type="file"] { font-size: 0.78rem; max-width: 100%; }
+.gen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.gen { width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--line); }
+@media (max-width: 760px) {
+  .game.app #stage { right: 0; bottom: 66%; }
+  .app-side { left: 0; top: 34%; border-left: 0; border-top: 1px solid var(--line); }
+  .app-head { min-height: 48px; padding: 5px 10px; }
+  .app-tabs button { padding: 6px 9px; font-size: 0.82rem; }
+}

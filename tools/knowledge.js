@@ -283,7 +283,6 @@ const PERSONA = [
   [['Do you speak Luganda?', 'Can you greet me in Luganda?'], 'Oli otya! That means how are you. My Luganda is only a beginning, and better local data will improve it.', 'greet'],
   [['Oli otya', 'Oli otya?'], 'Bulungi, webale! I am well, thank you. How can I help?', 'greet'],
   [['Webale', 'Webale nnyo'], 'Kale, you are welcome!', 'thanks'],
-  [['What is the capital of Uganda?', 'Where is Kampala?'], 'Kampala is the capital of Uganda.', 'good'],
   [['Tell me about this bootcamp', 'What is the AI and robotics bootcamp?'], 'It is a hands-on AI and robotics bootcamp in Uganda, where students build real models and robots.', 'good'],
   [['What should I build first?', 'Give me a first project.'], 'Start with one small useful assistant. Clean a small dataset, fine-tune it, measure it and show a real user.', 'good'],
 ];

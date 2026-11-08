@@ -396,7 +396,10 @@
   };
 
   // quiz modal: q = {q, a:[...], c: correctIndex, x: explanation}
-  AC.ui.quiz = function (q, { title = 'Quick check', onDone } = {}) {
+  AC.ui.quiz = function (q0, { title = 'Quick check', onDone } = {}) {
+    // answer order is shuffled, so the right answer is never always in the same place
+    const order = q0.a.map((_, i) => i).sort(() => Math.random() - 0.5);
+    const q = Object.assign({}, q0, { a: order.map((i) => q0.a[i]), c: order.indexOf(q0.c) });
     const answers = h('div', { class: 'ac-answers' });
     const explain = h('p', { class: 'ac-explain' });
     const cont = h('button', { class: 'ac-btn', type: 'button', hidden: true }, 'Continue');
@@ -731,8 +734,11 @@
         t.el.style.top = ((1 - v.y) / 2) * hh + 'px';
       }
     }
+    let skip = 0;
     function loop(ts) {
       requestAnimationFrame(loop);
+      // while real training runs, draw about 10 frames a second so the CPU goes to the training
+      if (AC.throttle && ts - last < 95) return;
       const real = Math.min(0.1, Math.max(0, (ts - last) / 1000)); // slow PCs: games sub-step this
       last = ts;
       const dt = AC.paused ? 0 : real;

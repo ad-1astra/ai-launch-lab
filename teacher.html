@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teacher Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono&family=Chakra+Petch:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/academy.css">
+<style>
+  body { background: var(--bg); overflow: auto; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; display: grid; gap: 22px; }
+  h1 { font-size: 2rem; color: var(--cyan); } h2 { font-size: 1.35rem; color: var(--cyan); margin-top: 8px; } h3 { font-size: 1.02rem; margin-top: 8px; }
+  p, li { max-width: 72ch; } ul { padding-left: 20px; margin: 6px 0; }
+  .tw { overflow-x: auto; } table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th { text-align: left; font-family: var(--f-hud); font-size: 0.7rem; color: var(--dim); border-bottom: 1px solid var(--line); padding: 6px; }
+  td { padding: 6px; border-bottom: 1px solid rgba(38, 64, 97, 0.6); vertical-align: top; }
+  .real { color: var(--green); font-family: var(--f-hud); font-size: 0.72rem; } .sim { color: var(--amber); font-family: var(--f-hud); font-size: 0.72rem; }
+  section { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .top { display: flex; gap: 10px; flex-wrap: wrap; }
+  @media print { body { background: #fff; color: #000; } section { border-color: #aaa; background: #fff; } h1, h2 { color: #000; } .top { display: none; } td, th, .dim { color: #000; } }
+</style>
+</head>
+<body>
+<main>
+<div class="top"><a class="ac-btn ghost small" href="index.html">Back to campus</a><button class="ac-btn ghost small" type="button" onclick="print()">Print</button></div>
+<div><h1>AI Launch Lab: teacher guide</h1><p>Based on "Building a Self-Hosted Multimodal AI Stack", Process Guide v1.0. Learners take one AI from a blank page to launch over 8 zones and 24 missions.</p></div>
+
+<section>
+<h2>Running it in the room</h2>
+<ul>
+<li><b>Time:</b> about 3 to 5 hours in total. Split it over sessions by zone. Progress saves in that browser, so learners should keep the same device and browser.</li>
+<li><b>Devices:</b> laptops or desktops are best, because real training uses the CPU. Fine-tuning takes roughly 2 to 6 minutes on a typical laptop. Phones work for most missions, but they train slowly.</li>
+<li><b>Internet:</b> needed to load the site the first time. After that it runs from the browser's cache only if the pages stay cached, so test this before class if your connection is unreliable. The optional real open models need a large download.</li>
+<li><b>Sharing a device:</b> add a player on the campus page. Each player gets their own AI.</li>
+<li><b>Pairs:</b> one learner drives, one reads the guide and predicts what will happen before each run. Swap at each zone.</li>
+<li><b>Test Arena:</b> Streak Run and Quiz Duel are in the Arena, with at least 10 questions per zone.</li>
+</ul>
+<h3>What is real, and what is simulated</h3>
+<div class="tw"><table>
+<tr><th>Real, on the learner's device</th><th>Simulated, labelled in amber</th></tr>
+<tr><td>The 12 cleaning stages on real rows, MinHash and LSH, PII scrub, Cohen's kappa, WER, code execution, perceptual hashes. LoRA, DPO and GRPO with real gradients. Merge, quantisation and sealed-test scores. Gateway keys, rate limits and routing. Retrieval, face, browser speech. The release zip, offline app and Node server.</td><td>GPU rental and prices. Fine-tuning Whisper (the WER curve is a model). Docker Compose assembly. Cluster load test (a queue model, using planning figures). Canary traffic numbers.</td></tr>
+</table></div>
+<p><b>Be honest with learners about scale.</b> The base has 722,176 parameters. A real 8B model has about 10,000 times more. Their AI is strong on what it trained on, and weak elsewhere. That honesty is the guide's own message: fine-tuning shapes behaviour, and it does not create frontier intelligence. To make a short browser run work, the game makes these choices and discloses them: adapters sit on the top 2 of 4 blocks; the learning rate is scaled by 15; a TF-IDF matcher finds the closest trained question; known questions run on the pure base (multi-LoRA routing); and emotion events come from small closed-choice heads.</p>
+</section>
+
+<section>
+<h2>Zone 1: Blueprint Hall (Parts 1 to 3)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>The merge myth</td><td>One gateway, many specialists</td><td>Pulls a merge lever, reads why it fails, then wires 8 jobs to specialists</td></tr>
+<tr><td>Write router v1</td><td>Rule routing; first match wins</td><td>Orders rules until 12 test requests route correctly. The table is used by their AI.</td></tr>
+<tr><td>Name it and pick the base</td><td>Selection rules, licences</td><td>Names the AI and picks a base by licence, size and tools, not leaderboard rank</td></tr>
+</table></div>
+<h3>Ask while they play</h3><ul><li>Why does a request with an image and /code go to vision? (Rule order.)</li><li>Why reject the leaderboard star? (Its licence is research only, and it needs 80 GB or more.)</li></ul>
+</section>
+
+<section>
+<h2>Zone 2: Eval Vault (Parts 4.1 and 9)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>Write your seed examples</td><td>Handwritten seeds, schema, tokens</td><td>Edits 15 starters and writes at least 5 rows. Sees the real tokens and masks.</td></tr>
+<tr><td>Seal the test set</td><td>Evaluation first; baseline</td><td>Adds golden prompts, seals the set, and measures the untouched base</td></tr>
+</table></div>
+<h3>Ask</h3><ul><li>Why does the base score zero on identity? (It has never heard the name.)</li><li>Why seal before collecting? (It defines what data you need, and later rows can be checked against it.)</li></ul>
+</section>
+
+<section>
+<h2>Zone 3: Data Refinery (Part 4)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>The provenance gate</td><td>Licences, consent, share-alike</td><td>Admits 11 and rejects 4 of 15 sources (rival API, non-commercial, scraped, no consent)</td></tr>
+<tr><td>Run the 12-stage line</td><td>Stage order, the 50 percent rule</td><td>Fixes a broken line until 11 measured checks pass</td></tr>
+<tr><td>Modality bench</td><td>Speech, code, vision, emotion checks</td><td>Uses real WER, code execution, perceptual hash and kappa</td></tr>
+<tr><td>Pass the quality gates</td><td>Manual review, data card</td><td>Reads a real sample, writes known gaps, signs the card</td></tr>
+</table></div>
+<h3>Answers for the broken line</h3><ul><li>Order: extract, normalise, language ID, heuristics, exact dedupe, near-duplicates, quality, PII, safety, decontaminate, format, split.</li><li>Settings: symbol ratio about 0.6, near-duplicate 0.8, drop refusals, chat template, split by conversation.</li></ul>
+<h3>Ask</h3><ul><li>Why did a stage remove half of one source? (Look at the samples. Sometimes the source is bad, and sometimes the filter is.)</li><li>Why does the PII stage also merge rows? (Scrubbing makes them identical.)</li></ul>
+</section>
+
+<section>
+<h2>Zone 4: Agent Sandbox (Part 6.2)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>Build the cage</td><td>Isolation, allowlist, timeouts, confirmations, audit</td><td>Configures the harness until 8 test commands behave correctly</td></tr>
+<tr><td>Record verified trajectories</td><td>Verification, recovery examples</td><td>Solves 3 tasks in a real virtual shell. Only verified runs are kept.</td></tr>
+</table></div>
+<p><b>Answers:</b> isolation Docker or gVisor, a timeout, allowlist on, confirm on, audit on, network off. Task 1 fix: <code>write calc.js function add(a, b) { return a + b; } function multiply(a, b) { return a * b; }</code></p>
+<p>Nothing typed here touches the real computer. It is a virtual file system.</p>
+</section>
+
+<section>
+<h2>Zone 5: Training Hall (Parts 5, 6.1, 6.2, 7)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>GPU and the overfit test</td><td>Hardware table, tiny overfit test</td><td>Picks the cheapest fitting GPU, then fixes the template, mask and learning rate until 20 rows are memorised</td></tr>
+<tr><td>The real LoRA fine-tune</td><td>Safe hyperparameters, replay, beat the base</td><td>Trains for real on the cleaned data. It must beat the base on the sealed test.</td></tr>
+<tr><td>Fix the failures</td><td>Rounds beat one big run; dev vs sealed</td><td>Reads failures, writes better answers, retrains with a regression check</td></tr>
+<tr><td>Train the agent</td><td>Multi-LoRA, SFT, GRPO</td><td>Second adapter on verified trajectories, then real rewards from the harness</td></tr>
+<tr><td>Polish with DPO</td><td>Chosen vs rejected</td><td>Judges 8 pairs of the model's own answers, then trains on those choices</td></tr>
+</table></div>
+<p><b>Answers:</b> template with &lt;|user|&gt;, assistant tokens only, learning rate 2e-4; rank 16 to 64, alpha 2x rank, 1 to 3 epochs, batch 32 or more, replay 10 to 30 percent.</p>
+<h3>Ask</h3><ul><li>The loss fell, but the model failed the recall test. Why? (Wrong template: it learned a format you will not serve.)</li><li>What happens with no replay? (General scores can fall. Try it.)</li></ul>
+</section>
+
+<section>
+<h2>Zone 6: Face and Voice Studio (Parts 6.3 to 6.6)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>Teach it to see</td><td>Frozen encoder, question types, no hallucination</td><td>Shares 400 images across question types until each passes on fresh images</td></tr>
+<tr><td>Give it a voice</td><td>WER per accent, consent, Kokoro</td><td>Plans Whisper hours (simulated), picks a licensed voice, hears real speech</td></tr>
+<tr><td>Bring the face to life</td><td>Renderer vs model, latency budget</td><td>Tunes blink, idle and easing, plays real events, adds up the budget</td></tr>
+</table></div>
+</section>
+
+<section>
+<h2>Zone 7: Server Hall (Parts 7 and 8)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>Merge, quantise, re-test</td><td>Test the artefact you ship</td><td>Proves the merge changes nothing, tests builds, and ships the smallest that passes</td></tr>
+<tr><td>Compose the stack</td><td>Gateway, keys, limits, load test</td><td>Assembles services, passes real gateway checks, survives 2x traffic and a dead backend</td></tr>
+</table></div>
+<p><b>Answer for the load test:</b> continuous batching on and streaming on usually pass. The CPU fallback or a second node handles the failure case.</p>
+</section>
+
+<section>
+<h2>Zone 8: Launch Pad (Parts 9 to 11)</h2>
+<div class="tw"><table><tr><th>Mission</th><th>Concept</th><th>What the learner does</th></tr>
+<tr><td>Red-team your model</td><td>Jailbreaks, injection, privacy</td><td>Attacks the real system, turns on guards, and runs the final sealed test</td></tr>
+<tr><td>Package the release</td><td>Cards, licence, quickstart</td><td>Writes cards, passes a timed quickstart, downloads a real zip</td></tr>
+<tr><td>Launch day</td><td>Canary rollout</td><td>Rolls out in stages, rolls back when the numbers go wrong, then launches</td></tr>
+</table></div>
+<h3>After launch</h3>
+<ul><li><b>My AI:</b> chat with voice and face, the agent, vision, images, documents, API, and thumbs feedback. Corrections can retrain it into v1.1 for real.</li><li><b>Offline app:</b> one HTML file from the release runs anywhere.</li><li><b>Real API:</b> <code>node server.js</code> from the release gives an OpenAI-compatible endpoint on a real port.</li><li><b>Next step on a real GPU:</b> the release has <code>real-gpu/</code> scripts and the cleaned dataset. These scripts are generated and have not been run on a GPU, so review them with the class first.</li></ul>
+</section>
+</main>
+</body>
+</html>
